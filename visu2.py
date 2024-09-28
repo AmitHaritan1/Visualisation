@@ -18,16 +18,6 @@ from matplotlib import cm
 import plotly.graph_objects as go
 import plotly.express as px
 
-columns_to_convert = [
-    'בדלי סיגריות', 'קופסאות סיגריות', 'מסכות כירורגיות',
-    'מכלי משקה למיניהם', 'פקקים של מכלי משקה', 'אריזות מזון Take Away נייר',
-    'אריזות מזון Take Away פלסטיק', 'צלחות חדפ', 'סכום חדפ',
-    'כוסות שתייה קרה חדפ', 'כוסות שתייה חמה חדפ', 'אריזות של חטיפים',
-    'זכוכית לא מכלי משקה או לא ניתן לזיה', 'נייר אחר לא אריזות מזון',
-    'פלסטיק אחר שקיות פלסטיק ורכיבי פלס', 'פסולת אורגנית', 'פסולת בלתי חוקית שקית אשפה מלאה שה',
-    'פסולת אחרת למשל בגדים סוללות חומרי', 'צואת כלבים', 'כתמי מסטיק',
-    'פריט פסולת גדול', 'אריזות קרטון', 'גרפיטי', 'אחר1', 'אחר2'
-]
 
 def fetch_data_and_create_df(api_dict):
     """
@@ -324,7 +314,11 @@ def get_color_scale(avg_value, min_value, max_value):
 def plot_top_k_behaviors(city, k):
     # Filter the dataframe for the chosen city
     df = data_frames['behaviors']
-    df_filtered = df[df['יישוב'] == city]
+    if city != 'כל הארץ':
+        # Filter the data for the selected city
+        df_filtered = df[df['יישוב'] == city]
+    else:
+        df_filtered = df
     # List of the 'heged' columns
     heged_columns = [f'heged{i}' for i in range(1, 14)]
     # Melt the dataframe to turn all 'heged' columns into rows (ignoring null values)
@@ -340,7 +334,7 @@ def plot_top_k_behaviors(city, k):
     others_count = phrase_counts.sum() - top_k_phrases.sum()
 
     # Combine the top k phrases with the "Others" slice
-    all_phrases = top_k_phrases.append(pd.Series({'Others': others_count}))
+    all_phrases = pd.concat([top_k_phrases, pd.Series({'Others': others_count})])
 
     # Calculate the percentage of each phrase, including "Others"
     total_phrases_count = phrase_counts.sum()
@@ -351,8 +345,17 @@ def plot_top_k_behaviors(city, k):
         names=phrases_percentage.index,
         values=phrases_percentage.values,
         hole=0.4,  # Creates the donut hole
-        title=f'Top {k} Phrases and Others in {city}',
+        title=f'Top {k} Phrases and Others in {city}',  # This title will be overridden
         labels={'phrase': 'Phrase', 'count': 'Count'},
+    )
+
+    # Update the layout to customize the title
+    fig.update_layout(
+        title={
+            'text': f' {k} הביטויים המובילים ו"אחרים" ב-{city}',
+            'x': 1.0,  # Align to the right
+            'xanchor': 'right'
+        }
     )
     fig.update_traces(sort=False, direction="clockwise")
     fig.update_traces(textinfo='percent', texttemplate='%{percent:.1%}')
@@ -366,10 +369,15 @@ def plot_waste_levels_by_city(city):
     waste_levels_order = ['ריק', '1/4', '1/2', '3/4', 'מלא']
 
     # Filter the data where 'האם יש פחים בנקודת המדידה' is 'כן' and the selected city
-    df_filtered = data_frames['bin_storage'][
-        (data_frames['bin_storage']['האם יש פחים בנקודת המדידה'] == 'כן') &
-        (data_frames['bin_storage']['יישוב'] == city)
-        ]
+    if city != 'כל הארץ':
+        # Filter the data for the selected city
+        df_filtered = data_frames['bin_storage'][
+            (data_frames['bin_storage']['האם יש פחים בנקודת המדידה'] == 'כן') &
+            (data_frames['bin_storage']['יישוב'] == city)
+            ]
+    else:
+        df_filtered = data_frames['bin_storage'][
+        (data_frames['bin_storage']['האם יש פחים בנקודת המדידה'] == 'כן')]
 
     # Count occurrences of each 'מפלס הפסולת בפח' level
     waste_level_counts = df_filtered['מפלס הפסולת בפח'].value_counts()
@@ -388,7 +396,11 @@ def plot_waste_levels_by_city(city):
 
     # Update layout for Hebrew labels
     fig.update_layout(
-        title=f'מפלסי הפסולת בפחים עבור {city}',
+        title={
+            'text': f'מפלסי הפסולת בפחים עבור {city}',
+            'x': 1.0,  # Align to the right
+            'xanchor': 'right'
+        },
         xaxis_title='מפלס הפסולת בפח',
         yaxis_title='כמות',
         font=dict(family='Arial, sans-serif', size=14),
@@ -411,6 +423,16 @@ def prepare_data(data_frame):
     infrastructures_df = data_frames['infrastructures']
     dirt_information_df = data_frames['dirt_information']
     # prepare dirt_information
+    columns_to_convert = [
+        'בדלי סיגריות', 'קופסאות סיגריות', 'מסכות כירורגיות',
+        'מכלי משקה למיניהם', 'פקקים של מכלי משקה', 'אריזות מזון Take Away נייר',
+        'אריזות מזון Take Away פלסטיק', 'צלחות חדפ', 'סכום חדפ',
+        'כוסות שתייה קרה חדפ', 'כוסות שתייה חמה חדפ', 'אריזות של חטיפים',
+        'זכוכית לא מכלי משקה או לא ניתן לזיה', 'נייר אחר לא אריזות מזון',
+        'פלסטיק אחר שקיות פלסטיק ורכיבי פלס', 'פסולת אורגנית', 'פסולת בלתי חוקית שקית אשפה מלאה שה',
+        'פסולת אחרת למשל בגדים סוללות חומרי', 'צואת כלבים', 'כתמי מסטיק',
+        'פריט פסולת גדול', 'אריזות קרטון', 'גרפיטי', 'אחר1', 'אחר2'
+    ]
 
     dirt_information_df.dropna(subset=['נ.צ כתובת', 'יישוב'], inplace=True)
     dirt_information_df[columns_to_convert] = dirt_information_df[columns_to_convert].apply(pd.to_numeric, errors='coerce')
@@ -431,6 +453,16 @@ if __name__ == '__main__':
     data_frames = fetch_data_and_create_df(api_resource_ids)
     bin_storage_df, behaviors_df, infrastructures_df, dirt_information_df = prepare_data(data_frames)
 
+    columns_to_convert = [
+        'בדלי סיגריות', 'קופסאות סיגריות', 'מסכות כירורגיות',
+        'מכלי משקה למיניהם', 'פקקים של מכלי משקה', 'אריזות מזון Take Away נייר',
+        'אריזות מזון Take Away פלסטיק', 'צלחות חדפ', 'סכום חדפ',
+        'כוסות שתייה קרה חדפ', 'כוסות שתייה חמה חדפ', 'אריזות של חטיפים',
+        'זכוכית לא מכלי משקה או לא ניתן לזיה', 'נייר אחר לא אריזות מזון',
+        'פלסטיק אחר שקיות פלסטיק ורכיבי פלס', 'פסולת אורגנית', 'פסולת בלתי חוקית שקית אשפה מלאה שה',
+        'פסולת אחרת למשל בגדים סוללות חומרי', 'צואת כלבים', 'כתמי מסטיק',
+        'פריט פסולת גדול', 'אריזות קרטון', 'גרפיטי', 'אחר1', 'אחר2'
+    ]
 
     color_map = {
         'בדלי סיגריות': '#1f77b4',
@@ -466,7 +498,7 @@ if __name__ == '__main__':
     cities_sort = ['כל הארץ'] + sorted(filtered_df['יישוב'].unique())
     measurer_type_list = filtered_df['סוג נקודת המדידה'].unique()
 
-    df =filtered_df
+    df = filtered_df
     # Assuming df is your DataFrame
     df[columns_to_convert] = df[columns_to_convert].apply(pd.to_numeric, errors='coerce')
 
@@ -544,6 +576,8 @@ if __name__ == '__main__':
         plot_top5_waste_types(city, measurer_type, k)
         plot_infrastructure_condition(infrastructures_df, city)
         plot_behaviors_teorshlilihiyuvi(city)
+        plot_top_k_behaviors(city,k)
+        plot_waste_levels_by_city(city)
 
     # In the second column, show the map
     with col2:
